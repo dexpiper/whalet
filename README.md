@@ -66,7 +66,8 @@ Service is under construction. Only JSON-rendered responces currently provided, 
         "time"      : date and time in ISO format (like 2021-09-08T10:15:45.856743)
         "optype"    : one of the following types of operation:
                         'creation', 'deposit', 'transaction'
-        "amount"    : a number 'ddd.dd', two digits precision. Could be negative in case of outcoming transaction
+        "amount"    : a number 'ddd.dd', two digits precision. 
+                    Could be negative in case of outcoming transaction
     }
 
 #### Deposit
@@ -74,7 +75,7 @@ Service is under construction. Only JSON-rendered responces currently provided, 
 
 `curl "http://127.0.0.1:5000/v1/<wallet_name>/deposit?sum=<sum>" -X PUT`
 
-Mandatory arguments:
+**Mandatory arguments:**
 
 | Arg name  |          Description             |
 |:---------:|----------------------------------|
@@ -92,7 +93,7 @@ Mandatory arguments:
 
 `curl "http://127.0.0.1:5000/v1/<from_wallet_name>/pay/?to=<to_wallet_name>&sum=<sum>" -X PUT`
 
-Mandatory arguments:
+**Mandatory arguments**:
 
 | Arg name      |          Description             |
 |:-------------:|----------------------------------|
@@ -105,9 +106,6 @@ Mandatory arguments:
 |               |transfer money into               |
 
 
-
-
-
 #### Response
 
     200, {"<from_wallet_name>:new_balance": <actual balance>}
@@ -116,7 +114,7 @@ Mandatory arguments:
 
 Project currently is in an early development stage. General functions seemed to work fine as a scratch solution, but state is unstable and some bugs are present for sure.
 
-Next development steps:
+**Next development steps:**
 
 1) Write tests an improve stability without 500-code error in any quiery
 2) Implemet token-based authorization of users
