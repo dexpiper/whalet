@@ -7,7 +7,7 @@ Simple wallet server. Under construction
 1. [Introduction](#introduction)
 2. [Technologies and libraries](#technologies-and-libraries)
 3. [API description](#REST-API)
-4. [Current development state]
+4. [Current development state](#current-development-state)
 
 # Introduction
 
@@ -75,8 +75,13 @@ Service is under construction. Only JSON-rendered responces currently provided, 
 `curl "http://127.0.0.1:5000/v1/<wallet_name>/deposit?sum=<sum>" -X PUT`
 
 Mandatory arguments:
-    - sum  : positive number. If more then 2 digits after delimiter passed,
-             the number would be rounded up or down to 0.01 precision.
+
+| Arg name  |          Description             |
+|:---------:|----------------------------------|
+| sum       |positive number. If more then 2   |
+|           |digits after delimiter passed, the| 
+|           |number would be rounded up or down| 
+|           |to 0.01 precision.                |
 
 #### Response
 
@@ -88,9 +93,20 @@ Mandatory arguments:
 `curl "http://127.0.0.1:5000/v1/<from_wallet_name>/pay/?to=<to_wallet_name>&sum=<sum>" -X PUT`
 
 Mandatory arguments:
-    - sum              : positive number. If more then 2 digits after delimiter passed,
-                         the number would be rounded up or down to 0.01 precision.
-    - to_wallet_name   : a name of target wallet where to transfer money into
+
+| Arg name      |          Description             |
+|:-------------:|----------------------------------|
+| sum           |positive number. If more then 2   |
+|               |digits after delimiter passed, the| 
+|               |number would be rounded up or down| 
+|               |to 0.01 precision.                |
+|               |                                  |
+|to_wallet_name |a name of target wallet where to  |
+|               |transfer money into               |
+
+
+
+
 
 #### Response
 
