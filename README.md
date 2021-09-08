@@ -2,6 +2,8 @@
 
 Simple wallet server. Under construction
 
+![whaletimg](https://user-images.githubusercontent.com/58036191/132571248-0b35cd07-1eeb-46a6-be99-b67227eca668.png)
+
 # Table of contents
 
 1. [Introduction](#introduction)
