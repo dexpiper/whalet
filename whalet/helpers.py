@@ -1,52 +1,121 @@
 '''
 Useful functions to leverage responses
 '''
-from decimal import Decimal
 import json
+from decimal import Decimal
+from math import trunc
 
-from flask import Flask
+from flask import Flask, request
+from sqlalchemy import or_
+from sqlalchemy.orm import session
 
-from whalet.data import data
 
-#
-# making response from data with Decimal
-#
-def cook_response(app: Flask, data, format='json'):
+def cook_response(app: 'Flask', data, format='json'):
     '''
-    Make flask response with respect of special
-    json.dumps default params dealing with
-    Decimal numbers in dict.
+    Slightly modified json.dumps(). Returns
+    flask response with default params
+    dealing with Decimal numbers.
     '''
     def decimal_json_default(obj):
         if isinstance(obj, Decimal):
-            return float(obj)
+            return str(obj)
 
     if format == 'json':
         func = decimal_json_default
     elif format == 'xml':
         # not implemented
         pass
-    
+
     resp = app.response_class(
-        f"{json.dumps(data, default=func)}\n",
-        mimetype=app.config["JSONIFY_MIMETYPE"],
+        f"{json.dumps(data, default=func)}",
+        mimetype="application/json"
+        # app.config["JSONIFY_MIMETYPE"],
     )
 
     return resp
 
+
 def safe_round(arg: Decimal):
-    return round(arg, 2)
+    '''
+    Truncate given number up to 2 digits after
+    delimiter (without any rounding):
 
-# depricated
-def transfer(
-        from_wallet: str,
-        to_wallet: str,
-        amount: Decimal):
-    balance_from = data['wallets'][from_wallet]['balance']
-    balance_to = data['wallets'][to_wallet]['balance']
-    balance_from -= amount
-    balance_to += amount
-    data['wallets'][from_wallet]['balance'] = balance_from
-    data['wallets'][to_wallet]['balance'] = balance_to
-    return balance_from, balance_to
+    >>> safe_round(15.0199999999)
+    >>> 15.01
+    '''
+    arg = arg * 100
+    arg = trunc(arg)
+    arg = Decimal(str(arg / 100))
+    return arg
 
+
+def represent(arg: Decimal) -> str:
+    '''
+    Make string from Decimal number, with
+    2 digits after delimiter:
+
+    >>> represent(Decimal('42'))
+    >>> 42.00
+    '''
+    arg = '{:.2f}'.format(arg)
+    return arg
+
+
+def change_sign(result, wallet_name):
+    '''
+    Change sign (from plus to minus) for
+    outcoming transactions.
+    '''
+    for el in result:
+        if (
+            el['get_from'] == wallet_name
+        ) and (
+            el['optype'] == 'transaction'
+        ):
+            el['amount'] = '-' + el['amount']
+
+    return result
+
+
+def make_query(
+        db: session,
+        wallet_name: str,
+        model: object):
+    '''
+    Get ordered query object of all operations
+    '''
+    result = db.query(model).filter(
+        or_(
+            model.sent_to == wallet_name,
+            model.get_from == wallet_name
+        )).order_by(model.time)
+    return result
+
+
+def shutdown_server():
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func is None:
+        raise RuntimeError('Not running with the Werkzeug Server')
+    func()
+
+
+def request_constr(
+        method='GET',
+        adr='http://127.0.0.1:5000/v1',
+        addition='',
+        **kwargs):
+    '''
+    Depricated.
+    Helps to form requests for curl
+    '''
+    start = f"""curl -X {method}"""
+    if not addition.startswith('/'):
+        addition = '/' + addition
+    address = start + " '" + adr + addition
+    if kwargs:
+        address += '?'
+        for i, j in kwargs.items():
+            s = f'{i}={j}&'
+            address += s
+        address = address[:-1] + "'"
+    return address
