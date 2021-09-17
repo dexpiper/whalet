@@ -8,15 +8,14 @@ from whalet import models
 from whalet.database import Database
 
 
-# Settings
+# creating app
+app = create_app()
 
+# settings
 SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URL']
 
 
 if __name__ == '__main__':
-
-    # creating app
-    app = create_app()
 
     # creating database, session and tables
     dbase = Database(url=SQLALCHEMY_DATABASE_URI)
