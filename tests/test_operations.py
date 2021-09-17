@@ -6,6 +6,7 @@ from decimal import Decimal
 import html
 
 from pytest import fixture
+
 from whalet import models
 from whalet.check import Abort
 from whalet.database import Database

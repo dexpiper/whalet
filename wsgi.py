@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import os
+
 from whalet.factory import create_app
 from whalet.check import Abort
 from whalet import models
@@ -6,7 +10,7 @@ from whalet.database import Database
 
 # Settings
 
-SQLALCHEMY_DATABASE_URI = 'sqlite:///./whalet.db'
+SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URL']
 
 
 if __name__ == '__main__':
