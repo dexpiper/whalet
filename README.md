@@ -14,10 +14,9 @@ Simple wallet server. Under construction
 
 # Introduction
 
-Whalet is simple wallet application with REST API. Provides basic operations like creating wallet, deposit to wallet and make transactions between wallets. Also one can get history of operations.
-Addition TOKEN-protected method provided to get all current wallets and their balances.
+Whalet is simple wallet application with REST API. Provides basic operations like creating wallet, deposit to wallet and make transactions between wallets. Operation history supported.
 
-Balances stored as Str and marshalled as Decimal to ensure no troubles with float occured.
+Balances stored as Decimal to ensure no troubles with float occured. Given out as string with 2 digits precision.
 
 Service is under construction. Only JSON-rendered responces currently provided, no authorization needed.
 
@@ -25,7 +24,7 @@ Service is under construction. Only JSON-rendered responces currently provided, 
 
 * Python 3.9.5
 * Flask/gunicorn
-* SQLAlchemy/flask_sqlalchemy
+* SQLAlchemy
 * marshmallow
 * pytest, pylint, flake8, venv
 
@@ -35,6 +34,12 @@ Service is under construction. Only JSON-rendered responces currently provided, 
 `create wallet <wallet_name>`
 
 `curl "http://127.0.0.1:5000/v1/create/<wallet_name>" -X POST`
+
+Wallet name restrictions:
+
+- latin letters, numbers and "-" and "_"
+- should start with a letter or a number
+- 4 <= name length >= 14
 
 #### Response
 
@@ -49,10 +54,14 @@ Service is under construction. Only JSON-rendered responces currently provided, 
 
     200, {"<wallet_name>:balance": <actual balance>}
 
+Balance would be a string in 123.00 form (with 2 digits after delimiter).
+
 #### Get list of operations
 `get operations history for <wallet_name>`
 
 `curl "http://127.0.0.1:5000/v1/<wallet_name>/history" -X GET`
+
+Only bulk history load currently supported.
 
 #### Response
 
@@ -63,14 +72,14 @@ Service is under construction. Only JSON-rendered responces currently provided, 
     Operation markdown:
 
     {
-        "id"        : a unique identifier of operation
+        "id"        : a unique identifier of operation (UUID4)
         "get_from"  : wallet from where the transaction came
         "sent_to"   : wallet where the transaction went
         "time"      : date and time in ISO format (like 2021-09-08T10:15:45.856743)
         "optype"    : one of the following types of operation:
                         'creation', 'deposit', 'transaction'
         "amount"    : a number 'ddd.dd', two digits precision. 
-                    Could be negative in case of outcoming transaction
+                        Could be negative in case of outcoming transaction
     }
 
 #### Deposit
@@ -84,8 +93,7 @@ Service is under construction. Only JSON-rendered responces currently provided, 
 |:---------:|----------------------------------|
 | sum       |positive number. If more then 2   |
 |           |digits after delimiter passed, the| 
-|           |number would be rounded up or down| 
-|           |to 0.01 precision.                |
+|           |number would be truncated.        | 
 
 #### Response
 
@@ -102,11 +110,10 @@ Service is under construction. Only JSON-rendered responces currently provided, 
 |:-------------:|----------------------------------|
 | sum           |positive number. If more then 2   |
 |               |digits after delimiter passed, the| 
-|               |number would be rounded up or down| 
-|               |to 0.01 precision.                |
+|               |number would be truncated.        |
 |               |                                  |
-|to_wallet_name |a name of target wallet where to  |
-|               |transfer money into               |
+|to_wallet_name |name of target wallet where to    |
+|               |transfer money to                 |
 
 
 #### Response
@@ -119,7 +126,5 @@ Project currently is in an early development stage. General functions seemed to 
 
 **Next development steps:**
 
-1) Write tests an improve stability without 500-code error in any quiery
-2) Implemet token-based authorization of users
-3) Making uuid4-based id for every operation and implement verification mechanism
-4) Implement pagination for long operation histories
+1) Implemet token-based authorization
+2) Pagination for long operation histories

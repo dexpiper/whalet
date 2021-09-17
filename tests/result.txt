@@ -1,2 +1,0 @@
-<class 'dict'>
-{'Reachy:balance': 0.0}

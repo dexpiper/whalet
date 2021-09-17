@@ -66,7 +66,7 @@ class Abort:
         '''
         Wallet name limitations:
 
-        - only lowercase latin letters, numbers 0-9 and "-" and "_"
+        - latin letters, numbers 0-9 and "-" and "_"
         - should start with a letter or a number
         - name length should be less or equal 14 and more or equal 4
 
@@ -95,7 +95,7 @@ class Abort:
         if not good_name:
             abort(
                 400,
-                'Bad wallet name. Only lowercase letters, digits \
+                'Bad wallet name. Only letters, digits \
                     and "-", "_" chars allowed.'
                 )
 
