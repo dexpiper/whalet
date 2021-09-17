@@ -22,7 +22,7 @@ class Database:
     def make_engine(self):
         engine = create_engine(
             self.url,
-            connect_args={'check_same_thread': False}
+            # connect_args={'check_same_thread': False}
         )
         return engine
 

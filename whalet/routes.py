@@ -60,7 +60,7 @@ def hello():
     '''
     Say hello
     '''
-    app.logger.info('Got test request.')
+    app.logger.info('Got test request. Returning answer')
     resp = cook_response(app, {'hello': 'world!'})
     return resp, 200
 

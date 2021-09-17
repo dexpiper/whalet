@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 import os
 
 from whalet.factory import create_app
@@ -12,32 +10,35 @@ from whalet.database import Database
 app = create_app()
 
 # settings
-SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URL']
+SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URI']
 
-app.logger.info('Creating database...')
 
-# creating database, session and tables
-dbase = Database(url=SQLALCHEMY_DATABASE_URI)
-db = dbase.create_session()
-models.Base.metadata.create_all(bind=dbase.engine)
+if __name__ == '__main__':
 
-app.logger.info('Registering aborter helper...')
+    app.logger.info('Creating database...')
 
-# creating Abort instance to help with errors
-# in user requests
-abort = Abort(app, db)
+    # creating database, session and tables
+    dbase = Database(url=SQLALCHEMY_DATABASE_URI)
+    db = dbase.create_session()
+    models.Base.metadata.create_all(bind=dbase.engine)
 
-# registering database and abort helper in app
-app.config['DATABASE_SESSION'] = db
-app.config['ABORT_HELPER'] = abort
+    app.logger.info('Registering aborter helper...')
 
-with app.app_context():
+    # creating Abort instance to help with errors
+    # in user requests
+    abort = Abort(app, db)
 
-    app.logger.info('Registering blueprint...')
+    # registering database and abort helper in app
+    app.config['DATABASE_SESSION'] = db
+    app.config['ABORT_HELPER'] = abort
 
-    # getting and registering routes from blueprint
-    from whalet import routes
-    app.register_blueprint(routes.main)
+    with app.app_context():
 
-app.logger.info('Starting app...')
-app.run(debug=True)
+        app.logger.info('Registering blueprint...')
+
+        # getting and registering routes from blueprint
+        from whalet import routes
+        app.register_blueprint(routes.main)
+
+    app.logger.info('Starting app...')
+    app.run(debug=True)
