@@ -34,4 +34,5 @@ if __name__ == '__main__':
         # getting and registering routes from blueprint
         from whalet import routes
         app.register_blueprint(routes.main)
+
     app.run(debug=True)
