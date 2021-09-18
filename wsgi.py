@@ -39,4 +39,4 @@ with app.app_context():
     app.register_blueprint(routes.main)
 
 app.logger.info('Starting app...')
-app.run(host="0.0.0.0", debug=True)
+app.run(host="0.0.0.0", debug=True, threaded=True)
