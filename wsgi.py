@@ -8,6 +8,7 @@ from whalet.database import Database
 
 # creating app
 app = create_app()
+app.logger.info('App created')
 
 # settings
 SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URI']
@@ -17,7 +18,6 @@ if __name__ == '__main__':
     app.logger.info('Creating database...')
 
     # creating database, session and tables
-    
     dbase = Database()  # url=SQLALCHEMY_DATABASE_URI
     db = dbase.create_session()
     models.Base.metadata.create_all(bind=dbase.engine)
