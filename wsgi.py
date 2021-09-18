@@ -10,13 +10,21 @@ from whalet.database import Database
 app = create_app()
 app.logger.info('App created')
 
+# CHANGE TO FALSE for using real database
+app.config['TESTING'] = True
+
 # settings
 SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URI']
 
 app.logger.info('Creating database...')
 
 # creating database, session and tables
-dbase = Database()  # url=SQLALCHEMY_DATABASE_URI
+if app.config['TESTING']:
+    app.logger.warning('App using SQLight temporary db')
+    dbase = Database()
+else:
+    dbase = Database(url=SQLALCHEMY_DATABASE_URI)
+
 db = dbase.create_session()
 models.Base.metadata.create_all(bind=dbase.engine)
 
@@ -37,6 +45,8 @@ with app.app_context():
     # getting and registering routes from blueprint
     from whalet import routes
     app.register_blueprint(routes.main)
+
+app.logger.info('Done with setting.')
 
 if __name__ == '__main__':
     app.logger.info('Starting app...')

@@ -41,7 +41,7 @@ Wallet name restrictions:
 - should start with a letter or a number
 - 4 <= name length >= 14
 
-#### Response
+**Response:**
 
     201, {"<wallet_name>:created": "true"}
 
@@ -50,7 +50,7 @@ Wallet name restrictions:
 
 `curl "http://127.0.0.1:5000/v1/<wallet_name>/balance" -X GET`
 
-#### Response
+**Response:**
 
     200, {"<wallet_name>:balance": <actual balance>}
 
@@ -63,7 +63,7 @@ Balance would be a string in 123.00 form (with 2 digits after delimiter).
 
 Only bulk history load currently supported.
 
-#### Response
+**Response:**
 
     200, {"<wallet_name>:operations"': [<result>]},
     
@@ -95,7 +95,7 @@ Only bulk history load currently supported.
 |           |digits after delimiter passed, the| 
 |           |number would be truncated.        | 
 
-#### Response
+**Response:**
 
     200, {"<wallet_name>:new_balance": <actual balance>}
 
@@ -116,7 +116,7 @@ Only bulk history load currently supported.
 |               |transfer money to                 |
 
 
-#### Response
+**Response:**
 
     200, {"<from_wallet_name>:new_balance": <actual balance>}
 
