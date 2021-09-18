@@ -1,5 +1,7 @@
 import os
 
+from werkzeug.middleware.proxy_fix import ProxyFix
+
 from whalet.factory import create_app
 from whalet.check import Abort
 from whalet import models
@@ -37,6 +39,8 @@ with app.app_context():
     # getting and registering routes from blueprint
     from whalet import routes
     app.register_blueprint(routes.main)
+
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 app.logger.info('Starting app...')
 app.run(debug=True)
