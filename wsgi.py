@@ -11,14 +11,14 @@ app = create_app()
 
 # settings
 SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URI']
-SQLALCHEMY_DATABASE_URI
 
 if __name__ == '__main__':
 
     app.logger.info('Creating database...')
 
     # creating database, session and tables
-    dbase = Database()
+    
+    dbase = Database()  # url=SQLALCHEMY_DATABASE_URI
     db = dbase.create_session()
     models.Base.metadata.create_all(bind=dbase.engine)
 
