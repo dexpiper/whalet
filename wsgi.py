@@ -38,5 +38,6 @@ with app.app_context():
     from whalet import routes
     app.register_blueprint(routes.main)
 
-app.logger.info('Starting app...')
-app.run(host="0.0.0.0", debug=True, threaded=True)
+if __name__ == '__main__':
+    app.logger.info('Starting app...')
+    app.run(host="0.0.0.0", debug=True, threaded=True)
