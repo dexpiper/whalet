@@ -43,4 +43,4 @@ with app.app_context():
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 app.logger.info('Starting app...')
-app.run(debug=True)
+app.run(host="0.0.0.0", debug=True)
