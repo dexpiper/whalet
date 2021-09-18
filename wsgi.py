@@ -11,7 +11,7 @@ app = create_app()
 app.logger.info('App created')
 
 # settings
-SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URI']
+# SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URI']
 
 if __name__ == '__main__':
 
