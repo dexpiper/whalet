@@ -28,11 +28,7 @@ from flask import current_app
 # internal modules
 from whalet import models, schema
 from whalet.helpers import (change_sign, cook_response,
-                            make_query, represent, safe_round,
-                            shutdown_server)
-
-# // under construction
-# // from whalet.registry import IdStorage, make_register, get_id
+                            make_query, represent, safe_round)
 
 
 #
@@ -131,9 +127,6 @@ def get_balance(wallet_name):
         models.Wallet.name == wallet_name
     ).first()
 
-    # balance.balance: Decimal
-    app.logger.info(f'Balance: {balance.balance}')
-
     # balance: str
     balance = represent(balance.balance)
     resp = cook_response(
@@ -161,36 +154,13 @@ def get_history(wallet_name, page=1):
 
     # TODO(Alex): pagination with Query obj does not work
     # need some pure SQL implementation
-    '''paginator = the_query.paginate(
-                page, per_page=15, error_out=False)
 
-    total_pages = paginator.pages
-
-    abort.if_page_not_exist(
-        asked_page=page,
-        total_pages=total_pages)
-
-    page_items = paginator.items
-
-    if len(page_items) < 2:
-        result = operation_schema.dump(
-            page_items)
-    else:
-        result = operations_schema.dump(
-            page_items)'''
-
-    # TODO(Alex): to be changed, temporary solution
     result = operations_schema.dump(the_query.all())
     result = change_sign(result, wallet_name)
     resp = cook_response(
         app,
         {f'{wallet_name}:history': result}
         )
-
-    '''resp = cook_response(
-        app,
-        {f'page:{page}of{total_pages}': result}
-        )'''
 
     return resp, 200
 
@@ -214,10 +184,6 @@ def deposit(wallet_name):
     abort.if_negative_arg(adding, operation='deposit')
     abort.if_zero_amount(adding)
 
-    # id checking
-    # // id = get_id()
-    # // abort.if_id_not_unique(id, idstorage)
-
     # actual balance changing
     wallet = db.query(models.Wallet).filter(
         models.Wallet.name == wallet_name).first()
@@ -237,9 +203,6 @@ def deposit(wallet_name):
 
     db.add(operation)
     db.commit()
-
-    # registering
-    # // reg = make_register(optype='deposit', amount=adding, id=id)
 
     resp = cook_response(
         app, {f'{wallet_name}:new_balance': new_balance}
@@ -279,26 +242,16 @@ def transaction(from_wallet):
         operation='transaction')
     abort.if_zero_amount(amount)
 
-    # id checking
-    # id = get_id()
-    # abort.if_id_not_unique(id, idstorage)
-
     # changing balances:
-    # from_wallet
-    wallet_1 = db.query(models.Wallet).filter(
-        models.Wallet.name == from_wallet).first()
-    old_balance_1 = Decimal(str(wallet_1.balance))
-    new_balance_1 = old_balance_1 - amount
-    wallet_1.balance = new_balance_1
-    db.commit()
+    db.query(models.Wallet).filter(
+        models.Wallet.name == from_wallet).update(
+            {models.Wallet.balance: models.Wallet.balance - amount}
+        )
 
-    # to_wallet
-    wallet_2 = db.query(models.Wallet).filter(
-        models.Wallet.name == to_wallet).first()
-    old_balance_2 = Decimal(str(wallet_2.balance))
-    new_balance_2 = old_balance_2 + amount
-    wallet_2.balance = new_balance_2
-    db.commit()
+    db.query(models.Wallet).filter(
+        models.Wallet.name == to_wallet).update(
+            {models.Wallet.balance: models.Wallet.balance + amount}
+        )
 
     # making history:
     operation = operation_schema.load(
@@ -323,13 +276,3 @@ def transaction(from_wallet):
     )
 
     return resp, 200
-
-
-# Shutdown command
-@main.route('/shutdown', methods=['GET', 'PUT'])
-def shutdown():
-    '''
-    Shutting server down
-    '''
-    shutdown_server()
-    return 'Server shutting down...'
