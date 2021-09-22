@@ -12,7 +12,7 @@ from whalet import models
 from whalet.check import Abort
 from whalet.database import Database
 from whalet.factory import create_app
-from tests.instruments import encode_name_and_password
+from tests.instruments import get_headers
 
 
 @fixture(scope='module')
@@ -141,33 +141,36 @@ def test_users_with_bad_token(client):
 
 @mark.parametrize('name', ['Alex', 'Alice', 'Bob', 'Ann'])
 def test_users_exist(client, create_wallets, name):
+
+    # sanity check
     assert create_wallets
+
     rv = client.get(f'/v1/wallets?token={MASTER_TOKEN}')
     assert name in str(rv.data)
 
 
 @mark.parametrize('fake_name', ['KingArthur', 'bacon41', 'Reachy'])
 def test_users_does_not_exist(
-        client, create_wallets, fake_name):
+        client,
+        create_wallets,
+        fake_name):
+
     assert create_wallets
+
     rv = client.get(f'/v1/wallets?token={MASTER_TOKEN}')
     assert fake_name not in str(rv.data)
 
 
 @mark.parametrize('name', ['Alex', 'Alice', 'Bob', 'Ann'])
 def test_get_balance_for_existing_user(
-        client, create_wallets, name):
+        client,
+        create_wallets,
+        name):
 
     assert create_wallets
 
-    # coding username and password for request
-    credentials = encode_name_and_password(
-        name=name,
-        password=common_password
-    )
-    # making headers
-    headers = {
-        'Authorization': f'Basic {credentials}'}
+    headers = get_headers(name=name,
+                          password=common_password)
 
     rv = client.get('/v1/balance', headers=headers)
     assert rv.status_code == 200
@@ -175,22 +178,23 @@ def test_get_balance_for_existing_user(
     assert balance == '0.00'
 
 
-'''
+@mark.parametrize('fake_name', ['KingArthur', 'Bacon', 'Eggs'])
 def test_get_balance_for_non_existing_user(
         client,
-        create_wallets
-):
-    assert create_wallets
-    fake_usernames = [
-            'KingArthur', 'Bacon', 'Eggs'
-        ]
-    for name in fake_usernames:
-        rv = client.get(f'/v1/{name}/balance')
-        assert rv.status_code == 404
+        create_wallets,
+        fake_name):
 
-        # using html.unescape due to HTML hash entites in response
-        assert f"Wallet {name} doesn't exist"\
-            in html.unescape(str(rv.data))
+    assert create_wallets
+
+    headers = get_headers(name=fake_name,
+                          password=common_password)
+
+    rv = client.get('/v1/balance', headers=headers)
+    assert rv.status_code == 404
+
+    # using html.unescape due to HTML hash entites in response
+    assert f"{fake_name} does not exist"\
+        in html.unescape(str(rv.data))
 
 
 def test_create_user_bad_named(client):
@@ -206,7 +210,7 @@ def test_create_user_bad_named(client):
         'Abc'                 # len(name) < 4
     ]
     for name in bad_names:
-        rv = client.post(f'/v1/create/{name}')
+        rv = client.post(f'/v1/create?name={name}&pwd={common_password}')
         assert rv.status_code == 400
         assert 'bad wallet name' in str(rv.data).lower()
 
@@ -215,7 +219,7 @@ def test_create_new_user(client):
 
     # perfect name for a wallet
     name = 'Reachy'
-    rv = client.post(f'/v1/create/{name}')
+    rv = client.post(f'/v1/create?name={name}&pwd={common_password}')
     assert rv.status_code == 201
     assert f'"{name}:created": "true"' in str(rv.data)
 
@@ -223,7 +227,10 @@ def test_create_new_user(client):
 def test_get_balance_new_user(client):
 
     name = 'Reachy'
-    rv = client.get(f'/v1/{name}/balance')
+    headers = get_headers(name=name,
+                          password=common_password)
+
+    rv = client.get('/v1/balance', headers=headers)
     assert rv.status_code == 200
     json_to_dict = json.loads(rv.data)
 
@@ -231,23 +238,38 @@ def test_get_balance_new_user(client):
     assert json_to_dict[f'{name}:balance'] == '0.00'
 
 
+def test_make_deposit_without_token(client):
+    rv = client.put('/v1/deposit?to=Reachy')
+    assert rv.status_code == 401
+    assert 'anauthorized' in str(rv.data).lower()
+
+
+def test_make_deposit_with_bad_token(client):
+    bad_token = 'baconeggsspamspamspam'
+    rv = client.put(f'/v1/deposit?to=Reachy&token={bad_token}')
+    assert rv.status_code == 401
+    assert 'token incorrect' in str(rv.data).lower()
+
+
 def test_make_deposit_without_proper_arg(client):
 
     name = 'Reachy'
 
     # <sum> arg has not been provided
-    rv = client.put(f'/v1/{name}/deposit')
+    rv = client.put(f'/v1/deposit?to={name}&token={MASTER_TOKEN}')
     assert rv.status_code == 400,\
-        'Did not return 400 when no arg was provided'
+        'Did not return 400 when no <sum> arg was provided'
 
     # <sum> arg has not been provided (other args wihout valid names)
+    # but with good token
     rv = client.put(
-        f'/v1/{name}/deposit?parrot=DeadTotally0&bacon=withSPAM')
+        f'/v1/deposit?parrot=DeadTotally0&bacon=SPAM&token={MASTER_TOKEN}')
     assert rv.status_code == 400,\
         'Did not return 400 whith no accurate arg name given'
 
     # wrong arg format
-    rv = client.put(f'/v1/{name}/deposit?sum=SPAMSPAMSPAM.42')
+    rv = client.put(
+        f'/v1/deposit?to={name}&sum=SPAMSPAMSPAM.42&token={MASTER_TOKEN}')
     assert rv.status_code == 400,\
         'Did not return 400 with inappropriate arg (non-numerical)'
 
@@ -255,19 +277,23 @@ def test_make_deposit_without_proper_arg(client):
 def test_make_deposit(client):
 
     name = 'Reachy'
-    rv = client.put(f'/v1/{name}/deposit?sum=42.221001')
+    rv = client.put(
+        f'/v1/deposit?to={name}&sum=42.221001&token={MASTER_TOKEN}')
     assert rv.status_code == 200
 
     # first deposit (+42.22)
-    rv = client.get(f'/v1/{name}/balance')
+    headers = get_headers(name=name,
+                          password=common_password)
+    rv = client.get('/v1/balance', headers=headers)
     assert rv.status_code == 200
     new_balance = json.loads(rv.data)[f'{name}:balance']
     assert str(new_balance) == '42.22'
 
     # second deposit (+15092.00)
-    rv = client.put(f'/v1/{name}/deposit?sum=15092')
+    rv = client.put(
+        f'/v1/deposit?to={name}&sum=15092&token={MASTER_TOKEN}')
     assert rv.status_code == 200
-    rv = client.get(f'/v1/{name}/balance')
+    rv = client.get('/v1/balance', headers=headers)
     new_balance = json.loads(rv.data)[f'{name}:balance']
     assert str(new_balance) == '15134.22'
 
@@ -277,19 +303,23 @@ def test_get_history_operations_first(client):
     # Reachy should have 3 records:
     # creation + deposit 42.22 + deposit +15092.00
     name = 'Reachy'
-    rv = client.get(f'/v1/{name}/history')
+    headers = get_headers(name=name,
+                          password=common_password)
+    rv = client.get('/v1/history', headers=headers)
     assert rv.status_code == 200
     history = json.loads(rv.data)[f'{name}:history']
     assert len(history) == 3
 
     # Alice has one record: creation
     name = 'Alice'
-    rv = client.get(f'/v1/{name}/history')
+    headers = get_headers(name=name,
+                          password=common_password)
+    rv = client.get('/v1/history', headers=headers)
     assert rv.status_code == 200
     history = json.loads(rv.data)[f'{name}:history']
     assert len(history) == 1
 
-
+'''
 def test_make_transaction_fake_wallet(client):
 
     from_wallet = 'Reachy'

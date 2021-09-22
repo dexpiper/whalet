@@ -83,14 +83,13 @@ def master_token_required(func):
     operations like deposit and wallets inspection.
     '''
     def function_wrapper(*args, **kwargs):
-        abort.if_value_not_specified(
-            arg='token', request=request,
-            code=401,
-            message='Anauthorized')
+        abort.if_value_not_specified(arg='token', request=request,
+                                     code=401, message='Anauthorized')
         token = request.args['token']
-        abort.if_token_incorrect(
-            token=token, master_token=master_token)
+        abort.if_token_incorrect(token=token,
+                                 master_token=master_token)
         return func(*args, **kwargs)
+
     function_wrapper.__name__ = func.__name__
     return function_wrapper
 
