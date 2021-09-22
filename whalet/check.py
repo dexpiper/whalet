@@ -44,7 +44,7 @@ class Abort:
                     name=wallet_name).scalar()
         if not c:
             abort(
-                404, f"Wallet {wallet_name} doesn't exist"
+                404, f"Wallet {wallet_name} does not exist"
             )
 
     def if_wallet_already_exists(

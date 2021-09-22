@@ -12,7 +12,7 @@ from whalet import models
 from whalet.check import Abort
 from whalet.database import Database
 from whalet.factory import create_app
-from tests.instruments import get_headers
+from tests.instruments import get_headers, RequestData
 
 
 @fixture(scope='module')
@@ -117,6 +117,20 @@ def create_wallets(app, db):
         return True
 
 
+@fixture(scope='module')
+def credentials():
+    '''
+    Create credentials for common testing request
+    '''
+    creds = RequestData(
+        from_wallet='Reachy',
+        to_wallet='Alice',
+        headers=get_headers(name='Reachy',
+                            password=common_password)
+    )
+    return creds
+
+
 def test_hello(client):
     rv = client.get('/')
     assert rv.status_code == 200
@@ -149,7 +163,7 @@ def test_users_exist(client, create_wallets, name):
     assert name in str(rv.data)
 
 
-@mark.parametrize('fake_name', ['KingArthur', 'bacon41', 'Reachy'])
+@mark.parametrize('fake_name', ['KingArthur', 'bacon41', 'rabbit1967'])
 def test_users_does_not_exist(
         client,
         create_wallets,
@@ -159,6 +173,21 @@ def test_users_does_not_exist(
 
     rv = client.get(f'/v1/wallets?token={MASTER_TOKEN}')
     assert fake_name not in str(rv.data)
+
+
+def test_get_balance_unauthorized(client):
+    name = 'Alex'
+
+    # without any auth
+    rv = client.get('/v1/balance')
+    assert rv.status_code == 401
+
+    # with bad credentials
+    wrong_password = 'thisparrotisnomore'
+    headers = get_headers(name=name,
+                          password=wrong_password)
+    rv = client.get('/v1/balance', headers=headers)
+    assert rv.status_code == 401
 
 
 @mark.parametrize('name', ['Alex', 'Alice', 'Bob', 'Ann'])
@@ -319,81 +348,97 @@ def test_get_history_operations_first(client):
     history = json.loads(rv.data)[f'{name}:history']
     assert len(history) == 1
 
-'''
-def test_make_transaction_fake_wallet(client):
 
-    from_wallet = 'Reachy'
-    to_wallet = 'Alice'
+def test_make_unauthorized_transaction(client, credentials):
+    c = credentials
+    # without any auth
+    rv = client.put(
+        f'/v1/pay?to={c.to_wallet}&sum=100.1')
+    assert rv.status_code == 401
+
+    # with bad password
+    bad_password = 'thisparrotisnomore'
+    custom_headers = get_headers(name=c.from_wallet,
+                                 password=bad_password)
+    rv = client.put(
+        f'/v1/pay?to={c.to_wallet}&sum=100.1', headers=custom_headers)
+    assert rv.status_code == 401
+
+
+def test_make_transaction_fake_wallet(client, credentials):
+    c = credentials
     fake_wallet = 'King_Arthur'
 
     # transaction from fake wallet
-    rv = client.put(f'/v1/{fake_wallet}/pay?to={to_wallet}')
+    name = fake_wallet
+    headers = get_headers(name=name,
+                          password=common_password)
+    rv = client.put(f'/v1/pay?to={c.to_wallet}', headers=headers)
     assert rv.status_code == 404
-    assert f"Wallet {fake_wallet} doesn't exist"\
+    assert f"{fake_wallet} does not exist"\
         in html.unescape(str(rv.data))
 
     # transaction to fake wallet
-    rv = client.put(f'/v1/{from_wallet}/pay?to={fake_wallet}')
+    rv = client.put(f'/v1/pay?to={fake_wallet}', headers=c.headers)
     assert rv.status_code == 404
-    assert f"Wallet {fake_wallet} doesn't exist"\
+    assert f"{fake_wallet} does not exist"\
         in html.unescape(str(rv.data))
 
 
-def test_make_transaction_without_arg(client):
-
-    from_wallet = 'Reachy'
-    to_wallet = 'Alice'
-
+def test_make_transaction_without_arg(client, credentials):
+    c = credentials
     # transaction without amount or destination specified
-    rv = client.put(f'/v1/{from_wallet}/pay?to={to_wallet}')
+    rv = client.put(f'/v1/pay?to={c.to_wallet}', headers=c.headers)
     assert rv.status_code == 400
-    rv = client.put(f'/v1/{from_wallet}/pay?sum=123.14')
+    rv = client.put('/v1/pay?sum=123.14', headers=c.headers)
     assert rv.status_code == 400
 
 
-def test_make_transaction_with_wrong_argtype(client):
-
-    from_wallet = 'Reachy'
-    to_wallet = 'Alice'
+def test_make_transaction_with_wrong_argtype(client, credentials):
+    c = credentials
 
     # transactions with wrong argument types:
     # letters in <sum> arg
-    rv = client.put(f'/v1/{from_wallet}/pay?to={to_wallet}&sum=SPamm1')
+    rv = client.put(
+        f'/v1/pay?to={c.to_wallet}&sum=SPamm1', headers=c.headers)
     assert rv.status_code == 400
     assert "wrong format (expected numeric)"\
         in html.unescape(str(rv.data))
 
     # two dots in arg
-    rv = client.put(f'/v1/{from_wallet}/pay?to={to_wallet}&sum=123.01.1')
+    rv = client.put(
+        f'/v1/pay?to={c.to_wallet}&sum=123.01.1', headers=c.headers)
     assert rv.status_code == 400
     assert "wrong format (expected numeric)"\
         in html.unescape(str(rv.data))
 
 
-def test_make_transaction_with_negative_argument(client):
+def test_make_transaction_with_negative_argument(
+        client, credentials):
 
-    from_wallet = 'Reachy'
-    to_wallet = 'Alice'
+    c = credentials
 
     # negative arg
-    rv = client.put(f'/v1/{from_wallet}/pay?to={to_wallet}&sum=-0.18')
+    rv = client.put(f'/v1/pay?to={c.to_wallet}&sum=-0.18', headers=c.headers)
     assert rv.status_code == 400
     assert "negative argument" in html.unescape(str(rv.data)).lower()
 
 
-def test_make_transaction_with_zero_argument(client):
+def test_make_transaction_with_zero_argument(
+        client, credentials):
 
-    from_wallet = 'Reachy'
-    to_wallet = 'Alice'
+    c = credentials
 
     # zero arg
-    rv = client.put(f'/v1/{from_wallet}/pay?to={to_wallet}&sum=0')
+    rv = client.put(
+        f'/v1/pay?to={c.to_wallet}&sum=0', headers=c.headers)
     assert rv.status_code == 400
     assert "Operation sum should be more or equal 0.01"\
         in html.unescape(str(rv.data))
 
     # arg --> zero
-    rv = client.put(f'/v1/{from_wallet}/pay?to={to_wallet}&sum=0.0001')
+    rv = client.put(
+        f'/v1/pay?to={c.to_wallet}&sum=0.0001', headers=c.headers)
     assert rv.status_code == 400
     assert "Operation sum should be more or equal 0.01"\
         in html.unescape(str(rv.data))
@@ -404,91 +449,103 @@ def test_make_transaction_without_money(client):
     from_wallet = 'Alice'
     to_wallet = 'Reachy'
 
+    name = from_wallet
+    headers = get_headers(name=name,
+                          password=common_password)
+
     # Alice has no money yet, but tries to pay Reachy
-    rv = client.put(f'/v1/{from_wallet}/pay?to={to_wallet}&sum=41.01')
+    rv = client.put(f'/v1/pay?to={to_wallet}&sum=41.01', headers=headers)
     assert rv.status_code == 409
     assert f"Not enough money in wallet {from_wallet}"\
         in html.unescape(str(rv.data))
 
 
-def test_make_valid_transaction(client):
+def test_make_valid_transaction(client, credentials):
 
-    from_wallet = 'Reachy'
-    to_wallet = 'Alice'
+    c = credentials
 
     # Reachy makes perfectly valid transaction (but stingy)
-    rv = client.put(f'/v1/{from_wallet}/pay?to={to_wallet}&sum=1.01')
+    rv = client.put(
+        f'/v1/pay?to={c.to_wallet}&sum=1.01', headers=c.headers)
     assert rv.status_code == 200
 
 
-def test_balances_after_first_transaction(client):
+def test_balances_after_first_transaction(client, credentials):
 
-    from_wallet = 'Reachy'
-    to_wallet = 'Alice'
+    c = credentials
 
     # Reachy should become 1.01 less reach (before 15134.22)
-    rv = client.get(f'/v1/{from_wallet}/balance')
+    rv = client.get('/v1/balance', headers=c.headers)
     assert rv.status_code == 200
-    reachy_balance = json.loads(rv.data)[f'{from_wallet}:balance']
+    reachy_balance = json.loads(rv.data)[f'{c.from_wallet}:balance']
     assert str(reachy_balance) == '15133.21'
 
     # Alice should asquire unbelievable wealth
-    rv = client.get(f'/v1/{to_wallet}/balance')
+    alice_headers = get_headers('Alice', common_password)
+    rv = client.get('/v1/balance', headers=alice_headers)
     assert rv.status_code == 200
-    alice_balance = json.loads(rv.data)[f'{to_wallet}:balance']
+    alice_balance = json.loads(rv.data)[f'{c.to_wallet}:balance']
     assert str(alice_balance) == '1.01'
 
 
-def test_get_history_operations_second(client):
+def test_get_history_operations_second(client, credentials):
+
+    c = credentials
 
     # Reachy has +1 operation in history
     name = 'Reachy'
-    rv = client.get(f'/v1/{name}/history')
+    rv = client.get('/v1/history', headers=c.headers)
     assert rv.status_code == 200
     history = json.loads(rv.data)[f'{name}:history']
     assert len(history) == 4
 
     # and Alice also has +1
     name = 'Alice'
-    rv = client.get(f'/v1/{name}/history')
+    alice_headers = get_headers('Alice', common_password)
+    rv = client.get('/v1/history', headers=alice_headers)
     assert rv.status_code == 200
     history = json.loads(rv.data)[f'{name}:history']
     assert len(history) == 2
 
 
-def test_mass_transaction(client):
+def test_mass_transaction(client, credentials):
+
+    c = credentials
 
     # sanity check
-    rv = client.get('/v1/Reachy/balance')
+    rv = client.get('/v1/balance', headers=c.headers)
     reachy_balance = json.loads(rv.data)['Reachy:balance']
     assert str(reachy_balance) == '15133.21'
 
     current_reachy_balance = Decimal('15133.21')
 
     for _ in range(25):
-        from_wallet = 'Reachy'
-        to_wallet = 'Alice'
 
-        rv = client.put(f'/v1/{from_wallet}/pay?to={to_wallet}&sum=0.01')
+        # Reachy (c.from_wallet) pays Alice 25 times
+
+        rv = client.put(
+            f'/v1/pay?to={c.to_wallet}&sum=0.01', headers=c.headers)
         assert rv.status_code == 200
 
-        rv = client.get(f'/v1/{from_wallet}/balance')
+        rv = client.get('/v1/balance', headers=c.headers)
         assert rv.status_code == 200
-        reachy_balance = json.loads(rv.data)[f'{from_wallet}:balance']
+        reachy_balance = json.loads(rv.data)['Reachy:balance']
         assert reachy_balance == str(
             current_reachy_balance - Decimal('0.01')
         )
         current_reachy_balance -= Decimal('0.01')
 
     # Reachy had 15133.21 before, now should have 15132.96 (- 0.25)
-    rv = client.get(f'/v1/{from_wallet}/balance')
+    name = 'Reachy'
+    rv = client.get('/v1/balance', headers=c.headers)
     assert rv.status_code == 200
-    reachy_balance = json.loads(rv.data)[f'{from_wallet}:balance']
+    reachy_balance = json.loads(rv.data)[f'{name}:balance']
     assert reachy_balance == '15132.96'
 
     # and Alice should posess total 1.26 (+ 0.25)
-    rv = client.get(f'/v1/{to_wallet}/balance')
+    name = 'Alice'
+    alice_headers = get_headers('Alice', common_password)
+    rv = client.get('/v1/balance', headers=alice_headers)
     assert rv.status_code == 200
-    alice_balance = json.loads(rv.data)[f'{to_wallet}:balance']
+    alice_balance = json.loads(rv.data)[f'{name}:balance']
     assert alice_balance == '1.26'
-'''

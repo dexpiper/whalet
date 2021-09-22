@@ -1,7 +1,7 @@
 '''
 Helpful instruments for tests
 '''
-
+from collections import namedtuple
 from base64 import b64encode
 
 
@@ -26,3 +26,8 @@ def get_headers(name, password, encoding='utf-8'):
     credentials = f'Basic {name_and_pwd}'
     headers = {'Authorization': f'{credentials}'}
     return headers
+
+
+# named tuple for RequestData
+RequestData = namedtuple(
+    'RequestData', ['from_wallet', 'to_wallet', 'headers'])
