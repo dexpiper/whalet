@@ -106,7 +106,12 @@ class Abort:
                 'Bad wallet name. Should start with a letter or a digit'
                 )
 
-    def if_value_not_specified(self, arg: str, request: object):
+    def if_value_not_specified(
+            self,
+            arg: str,
+            request: object,
+            code=400,
+            message='No value specifiend for the operation'):
         '''
         Abort if argument string could not be found
         in request.args
@@ -116,7 +121,7 @@ class Abort:
         except KeyError:
             self.app.logger.info(
                 f'Could not find {arg} in request.args')
-            abort(400, 'No value specifiend for the operation')
+            abort(code, message)
 
     def if_balance_falls_below_zero(
             self,
@@ -167,35 +172,60 @@ class Abort:
                 400, f'Argument {arg}: wrong format (expected numeric)'
             )
 
-    """def if_id_not_unique(
-        self,
-        id: str,
-        idstorage: IdStorage):
+    def if_bad_password(self, pwd: str):
         '''
-        UNDER CONSTRUCTION
-        Check if id is in IdStorage
+        Check password
         '''
-        if idstorage.verify(id) is False:
-            abort(409, 'Operation with given id has\
-                 already been performed')"""
-
-    """def if_token_incorrect(
-            self,
-            given_token,
-            actual_token):
-        '''
-        UNDER CONSTRUCTION
-        Check tokens
-        '''
-        if given_token != actual_token:
-            abort(403, 'Invalid token')"""
-
-    def if_page_not_exist(
-            self,
-            asked_page,
-            total_pages):
-        if asked_page > total_pages:
+        # pass length
+        if len(pwd) > 14:
             abort(
-                404,
-                f'Page No {asked_page} does not exist.\
-        Only pages from 1 to {total_pages} available')
+                400,
+                'Bad password. Too long'
+                )
+
+        if len(pwd) < 6:
+            abort(
+                400,
+                'Bad password. Too short'
+                )
+
+        # name chars
+        allowed = set(
+            string.ascii_lowercase
+            + string.ascii_uppercase
+            + string.digits
+            + '-' + '_' + '&' + '%'
+            + ':' + '#' + '@' + '?'
+            + '*' + '!' + '?' + '>'
+            + '<' + '.' + ',' + '~'
+        )
+        good_name = set(pwd) <= allowed
+        if not good_name:
+            abort(
+                400,
+                'Bad password. Unsupported chars'
+                )
+
+    def if_user_doesnt_exist(
+            self,
+            username: str,
+            model: object):
+        '''
+        Abort if username doesn't exist
+        '''
+        c = self.db.query(
+                model.id).filter_by(
+                    name=username).scalar()
+        if not c:
+            abort(
+                404, f"User {username} does not exist. Check login"
+            )
+
+    def if_token_incorrect(
+            self,
+            token: str,
+            master_token: str):
+        if not token == master_token:
+            abort(
+                401, "Token incorrect"
+            )

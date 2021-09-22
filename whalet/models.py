@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import Column, Integer, Numeric, String
 from sqlalchemy.types import DateTime
 from sqlalchemy.ext.declarative import declarative_base
+from werkzeug.security import generate_password_hash, check_password_hash
 
 
 Base = declarative_base()
@@ -29,3 +30,25 @@ class Wallet(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(20))
     balance = Column((Numeric(10, 2)))
+    password_hash = Column(String(128))
+
+    def hash_password(password) -> str:
+        '''
+        Hashing given password string to store
+        '''
+        hash = generate_password_hash(password)
+        return hash
+
+    def verify_password(session, name, password) -> bool:
+        '''
+        Varifying given password for given wallet name.
+        Argument session (<db> var in whalet.routes)
+        needed.
+        '''
+        wallet = session.query(Wallet).filter(
+            Wallet.name == name).first()
+        result = check_password_hash(
+            pwhash=wallet.password_hash,
+            password=password
+        )
+        return result

@@ -6,11 +6,13 @@ from decimal import Decimal
 import html
 
 from pytest import fixture
+from pytest import mark
 
 from whalet import models
 from whalet.check import Abort
 from whalet.database import Database
 from whalet.factory import create_app
+from tests.instruments import encode_name_and_password
 
 
 @fixture(scope='module')
@@ -24,11 +26,14 @@ def app():
 
     # test database
     TEST_URI = db_path
+    global MASTER_TOKEN
+    MASTER_TOKEN = 'whalesome'
 
     app = create_app()
     app.config['TESTING'] = True
     app.testing = True
     app.config['SQLALCHEMY_DATABASE_URI'] = TEST_URI
+    app.config['MASTER_TOKEN'] = MASTER_TOKEN
     yield app
 
     # cleaning up
@@ -85,12 +90,19 @@ def create_wallets(app, db):
 
         from whalet.routes import operation_schema, wallet_schema
 
-        # create wallets
+        # create wallets with common password
         usernames = ['Alex', 'Alice', 'Bob', 'Ann']
+        global common_password
+        common_password = '123456789test'
 
         for name in usernames:
             wallet = wallet_schema.load(
-                dict(name=name, balance=Decimal('0'))
+                dict(
+                    name=name,
+                    balance=Decimal('0'),
+                    password_hash=models.Wallet.hash_password(
+                        password=common_password)
+                )
             )
             operation = operation_schema.load(
                 dict(
@@ -111,44 +123,59 @@ def test_hello(client):
 
 
 def test_users_return(client):
-    rv = client.get('/v1/wallets')
+    rv = client.get(f'/v1/wallets?token={MASTER_TOKEN}')
     assert rv.status_code == 200
 
 
-def test_users_exist(client, create_wallets):
-    assert create_wallets
+def test_users_without_token(client):
     rv = client.get('/v1/wallets')
-    usernames = [
-            'Alex', 'Alice', 'Bob', 'Ann'
-        ]
-    for name in usernames:
-        assert name in str(rv.data)
+    assert rv.status_code == 401
+    assert 'anauthorized' in str(rv.data).lower()
 
 
-def test_users_does_not_exist(client, create_wallets):
+def test_users_with_bad_token(client):
+    rv = client.get('/v1/wallets?token=baconeggsspamspamspam')
+    assert rv.status_code == 401
+    assert 'token incorrect' in str(rv.data).lower()
+
+
+@mark.parametrize('name', ['Alex', 'Alice', 'Bob', 'Ann'])
+def test_users_exist(client, create_wallets, name):
     assert create_wallets
-    rv = client.get('/v1/wallets')
-    fake_usernames = [
-            'KingArthur', 'bacon41', 'Reachy'
-        ]
-
-    # nothing unexpected in database: Reachy has not come
-    for name in fake_usernames:
-        assert name not in str(rv.data)
+    rv = client.get(f'/v1/wallets?token={MASTER_TOKEN}')
+    assert name in str(rv.data)
 
 
-def test_get_balance_for_existing_user(client, create_wallets):
+@mark.parametrize('fake_name', ['KingArthur', 'bacon41', 'Reachy'])
+def test_users_does_not_exist(
+        client, create_wallets, fake_name):
     assert create_wallets
-    usernames = [
-            'Alex', 'Alice', 'Bob', 'Ann'
-        ]
-    for name in usernames:
-        rv = client.get(f'/v1/{name}/balance')
-        assert rv.status_code == 200
-        balance = json.loads(rv.data)[f'{name}:balance']
-        assert balance == '0.00'
+    rv = client.get(f'/v1/wallets?token={MASTER_TOKEN}')
+    assert fake_name not in str(rv.data)
 
 
+@mark.parametrize('name', ['Alex', 'Alice', 'Bob', 'Ann'])
+def test_get_balance_for_existing_user(
+        client, create_wallets, name):
+
+    assert create_wallets
+
+    # coding username and password for request
+    credentials = encode_name_and_password(
+        name=name,
+        password=common_password
+    )
+    # making headers
+    headers = {
+        'Authorization': f'Basic {credentials}'}
+
+    rv = client.get('/v1/balance', headers=headers)
+    assert rv.status_code == 200
+    balance = json.loads(rv.data)[f'{name}:balance']
+    assert balance == '0.00'
+
+
+'''
 def test_get_balance_for_non_existing_user(
         client,
         create_wallets
@@ -434,3 +461,4 @@ def test_mass_transaction(client):
     assert rv.status_code == 200
     alice_balance = json.loads(rv.data)[f'{to_wallet}:balance']
     assert alice_balance == '1.26'
+'''
