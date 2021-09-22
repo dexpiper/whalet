@@ -13,16 +13,17 @@ app.logger.info('App created')
 # CHANGE TO FALSE for using real database
 app.config['TESTING'] = True
 
-# settings
-SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URI']
-
 app.logger.info('Creating database...')
 
 # creating database, session and tables
 if app.config['TESTING']:
     app.logger.warning('App using SQLight temporary db')
     dbase = Database()
+    MASTER_TOKEN = 'whalesome'
+
 else:
+    SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URI']
+    MASTER_TOKEN = os.environ['MASTER_TOKEN']
     dbase = Database(url=SQLALCHEMY_DATABASE_URI)
 
 db = dbase.create_session()
@@ -37,6 +38,7 @@ abort = Abort(app, db)
 # registering database and abort helper in app
 app.config['DATABASE_SESSION'] = db
 app.config['ABORT_HELPER'] = abort
+app.config['MASTER_TOKEN'] = MASTER_TOKEN
 
 with app.app_context():
 

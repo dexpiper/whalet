@@ -37,6 +37,7 @@ class WalletSchema(Schema):
     id = fields.Int(dump_only=True)
     name = fields.Str()
     balance = fields.Decimal(as_string=True)
+    password_hash = fields.Str(load_only=True)
 
     @post_load
     def make_wallet(self, data, **kwargs):

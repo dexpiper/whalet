@@ -24,6 +24,7 @@ from flask import Blueprint
 from flask import abort as flask_abort
 from flask import request
 from flask import current_app
+from flask_httpauth import HTTPBasicAuth
 
 # internal modules
 from whalet import models, schema
@@ -38,7 +39,9 @@ app = current_app
 with app.app_context():
     db = current_app.config['DATABASE_SESSION']
     abort = current_app.config['ABORT_HELPER']
+    master_token = app.config['MASTER_TOKEN']
     main = Blueprint('main', __name__)
+    auth = HTTPBasicAuth()
 
 # setting marshmallow schemas
 
@@ -46,6 +49,49 @@ operation_schema = schema.OperationSchema()
 operations_schema = schema.OperationSchema(many=True)
 wallet_schema = schema.WalletSchema()
 wallets_schema = schema.WalletSchema(many=True)
+
+
+# setting authentication
+@auth.verify_password
+def verify_password(username, password):
+
+    if not password or not username:
+        return False
+
+    wallet = db.query(
+                models.Wallet).filter_by(
+                    name=username).scalar()
+
+    if not wallet:
+        current_app.logger.debug(f'Auth: No wallet {username} found')
+        abort.if_user_doesnt_exist(
+            username=username,
+            model=models.Wallet
+        )
+
+    if models.Wallet.verify_password(db, username, password):
+        return wallet
+
+    else:
+        return False
+
+
+# token auth
+def master_token_required(func):
+    '''
+    Decorator to ask master token for token-protected
+    operations like deposit and wallets inspection.
+    '''
+    def function_wrapper(*args, **kwargs):
+        abort.if_value_not_specified(arg='token', request=request,
+                                     code=401, message='Anauthorized')
+        token = request.args['token']
+        abort.if_token_incorrect(token=token,
+                                 master_token=master_token)
+        return func(*args, **kwargs)
+
+    function_wrapper.__name__ = func.__name__
+    return function_wrapper
 
 
 #
@@ -57,12 +103,13 @@ def hello():
     Say hello
     '''
     app.logger.info('Got test request. Returning answer')
-    resp = cook_response(app, {'hello': 'world!'})
+    resp = cook_response(app, {'Whaletapp': 'Welcome!'})
     return resp, 200
 
 
 # Get wallet list
 @main.route('/v1/wallets', methods=['GET'])
+@master_token_required
 def get_wallets():
     '''
     Get all the wallets and their balances
@@ -76,19 +123,32 @@ def get_wallets():
 
 
 # create a wallet
-@main.route('/v1/create/<wallet_name>', methods=['POST'])
-def create_wallet(wallet_name):
+@main.route('/v1/create', methods=['POST'])
+def create_wallet():
     '''
     Creating a new wallet with 0 balance
     '''
+    abort.if_value_not_specified(
+        arg='name', request=request)
+    abort.if_value_not_specified(
+        arg='pwd', request=request)
+    wallet_name = request.args['name']
+    password = request.args['pwd']
     abort.if_wallet_already_exists(
         wallet_name=wallet_name,
         model=models.Wallet
         )
     abort.if_bad_wallet_name(arg=wallet_name)
+    abort.if_bad_password(pwd=password)
     try:
+        app.logger.info('Trying to load new user into Wallet')
         wallet = wallet_schema.load(
-            dict(name=wallet_name, balance=Decimal('0'))
+            dict(
+                name=wallet_name,
+                balance=Decimal('0'),
+                password_hash=models.Wallet.hash_password(
+                    password=password)
+                )
         )
     except Exception as exc:
         app.logger.info(f'{exc}')
@@ -115,14 +175,14 @@ def create_wallet(wallet_name):
 
 
 # get balance for a wallet
-@main.route('/v1/<wallet_name>/balance', methods=['GET'])
-def get_balance(wallet_name):
+@main.route('/v1/balance', methods=['GET'])
+@auth.login_required
+def get_balance():
     '''
     Get balance for given wallet
     '''
-    abort.if_wallet_doesnt_exist(
-        wallet_name=wallet_name,
-        model=models.Wallet)
+    wallet_name = auth.current_user().name
+
     balance = db.query(models.Wallet).filter(
         models.Wallet.name == wallet_name
     ).first()
@@ -136,16 +196,48 @@ def get_balance(wallet_name):
     return resp, 200
 
 
+# change password for user
+@main.route('/v1/change_pass', methods=['PUT', 'POST'])
+@auth.login_required
+def change_password():
+    '''
+    Change password for user
+    '''
+    wallet_name = auth.current_user().name
+    abort.if_value_not_specified(
+        arg='pwd', request=request)
+    password = request.args['pwd']
+    abort.if_bad_password(pwd=password)
+
+    try:
+        app.logger.info('Trying to change password')
+        db.query(models.Wallet).filter(
+            models.Wallet.name == wallet_name).update(
+                {
+                    models.Wallet.password_hash:
+                        models.Wallet.hash_password(password)
+                }
+        )
+    except Exception as exc:
+        app.logger.info(f'{exc}')
+        flask_abort(500, 'Error during changing password')
+
+    resp = cook_response(
+        app,
+        {f'{wallet_name}:password': 'changed'})
+
+    return resp, 200
+
+
 # get op history for a wallet
-@main.route('/v1/<wallet_name>/history', methods=['GET'])
-@main.route('/v1/<wallet_name>/history/page/<int:page>', methods=['GET'])
-def get_history(wallet_name, page=1):
+@main.route('/v1/history', methods=['GET'])
+@main.route('/v1/history/page/<int:page>', methods=['GET'])
+@auth.login_required
+def get_history(page=1):
     '''
     Get history for given wallet
     '''
-    abort.if_wallet_doesnt_exist(
-        wallet_name=wallet_name,
-        model=models.Wallet)
+    wallet_name = auth.current_user().name
 
     the_query = make_query(
         db=db,
@@ -166,14 +258,14 @@ def get_history(wallet_name, page=1):
 
 
 # deposit money to wallet
-@main.route('/v1/<wallet_name>/deposit', methods=['PUT', 'POST'])
-def deposit(wallet_name):
+@main.route('/v1/deposit', methods=['PUT', 'POST'])
+@master_token_required
+def deposit():
     '''
     Deposit money in wallet
     '''
-    abort.if_wallet_doesnt_exist(
-        wallet_name=wallet_name,
-        model=models.Wallet)
+    abort.if_value_not_specified(arg='to', request=request)
+    wallet_name = request.args['to']
     abort.if_value_not_specified(arg='sum', request=request)
 
     # checking amount provided (aka <adding>)
@@ -212,13 +304,15 @@ def deposit(wallet_name):
 
 
 # transaction <from_wallet> <to_wallet>
-@main.route('/v1/<from_wallet>/pay', methods=['PUT', 'POST'])
-def transaction(from_wallet):
+@main.route('/v1/pay', methods=['PUT', 'POST'])
+@auth.login_required
+def transaction():
     '''
     Pay from one wallet to another
     '''
+    from_wallet = auth.current_user().name
+
     # pre-checkings
-    abort.if_wallet_doesnt_exist(from_wallet, models.Wallet)
     abort.if_value_not_specified(  # where to pay
         arg='to',
         request=request
