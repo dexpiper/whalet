@@ -194,16 +194,19 @@ class Abort:
             string.ascii_lowercase
             + string.ascii_uppercase
             + string.digits
-            + '-' + '_' + '&' + '%'
-            + ':' + '#' + '@' + '?'
-            + '*' + '!' + '?' + '>'
-            + '<' + '.' + ',' + '~'
+            + '-_$%:#@*!><.,~'
         )
         good_name = set(pwd) <= allowed
         if not good_name:
             abort(
                 400,
                 'Bad password. Unsupported chars'
+                )
+
+        if pwd.startswith(tuple('-_$%:#@*!><.,~')):
+            abort(
+                400,
+                'Bad wallet name. Should start with a letter or a digit'
                 )
 
     def if_user_doesnt_exist(

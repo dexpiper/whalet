@@ -244,6 +244,24 @@ def test_create_user_bad_named(client):
         assert 'bad wallet name' in str(rv.data).lower()
 
 
+def test_password_chars(client):
+    name = 'CpJackSparrow'
+    check_password = '1233!!-_%:#@*!><.,~'
+    rv = client.post(f'/v1/create?name={name}&pwd={check_password}')
+    assert rv.status_code == 201
+
+    name = 'Daisy'
+    check_password = 'abcd!$-_%:#@*!><.,~'
+    rv = client.post(f'/v1/create?name={name}&pwd={check_password}')
+    assert rv.status_code == 201
+
+    name = 'Flint'
+    check_password = '!$-_%:#kw.,~'
+    rv = client.post(f'/v1/create?name={name}&pwd={check_password}')
+    assert rv.status_code == 400
+    assert 'should start with a letter or a digit' in str(rv.data).lower()
+
+
 def test_create_new_user(client):
 
     # perfect name for a wallet
